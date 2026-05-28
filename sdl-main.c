@@ -2,12 +2,23 @@
 #include<stdint.h>
 #include<math.h>
 #include<SDL3/SDL.h>
-#include"model.h"
+#include"model-crane-cow.h"
 
 #define WINDOW_WIDTH 650U
 #define WINDOW_HEIGHT 650U
 #define FPS 120U
 #define NEAR_ZERO 0.001f
+#define POINT_SIZE 3.0f
+
+#define BG_RED 255U
+#define BG_GREEN 100U
+#define BG_BLUE 100U
+#define BG_A 255U
+
+#define FG_RED 0U
+#define FG_GREEN 0U
+#define FG_BLUE 0U
+#define FG_A 255U
 
 typedef struct {
 	SDL_Window *window;
@@ -95,8 +106,7 @@ static void draw_point(win_t *target, const float x, const float y, const float 
 		return;
 	}
 
-	const float size = 5.0f;
-	const float offset = size / 2.0f;
+	const float offset = POINT_SIZE / 2.0f;
 	
 	const float x_projection = project_x(x,z);
 	const float x_coordinate = transform_x_coordinate(x_projection) - offset;
@@ -105,7 +115,7 @@ static void draw_point(win_t *target, const float x, const float y, const float 
 	const float y_coordinate = transform_y_coordinate(y_projection) - offset;
 
 
-	SDL_FRect point = { x_coordinate, y_coordinate, size, size};
+	SDL_FRect point = { x_coordinate, y_coordinate, POINT_SIZE, POINT_SIZE};
 	(void)SDL_RenderFillRect(target->renderer, &point);
 }
 
@@ -137,9 +147,9 @@ static void draw_line(win_t *target,
 
 static void frame(win_t *target, const float dz, const float angle)
 {
-	(void)SDL_SetRenderDrawColor(target->renderer, 255U, 100U, 255U, 150U);
+	(void)SDL_SetRenderDrawColor(target->renderer, BG_RED, BG_GREEN, BG_BLUE, BG_A);
 	(void)SDL_RenderClear(target->renderer);
-	(void)SDL_SetRenderDrawColor(target->renderer, 99U, 35U, 188U, 255U);
+	(void)SDL_SetRenderDrawColor(target->renderer, FG_RED, FG_GREEN, FG_BLUE, FG_A);
 
 
 	for (uint32_t r = 0; r < POINT_COUNT; r++) {
@@ -194,12 +204,10 @@ static void mainloop(win_t *root)
 
 	SDL_Event event;
 
-	float dz = 1.0f;
+	float dz = 0.65f;
 	const float dt = 1.0f / FPS;
 	float angle = 0.0f;
 	const int32_t delay = 1000U / FPS;
-
-	(void)SDL_SetRenderDrawColor(root->renderer, 255U, 100U, 255U, 150U);
 
 	bool flag = false;
 	while (root->is_running) {
@@ -210,15 +218,15 @@ static void mainloop(win_t *root)
 		}
 
 		if (flag) {
-			//dz -= 1 * dt * 0.5f;
+			dz -= 1 * dt;
 			angle += 2.0 * (float)M_PI * dt / 10.0f;
-			if (dz <= 0.01f){
-				dz = 0.01f;
+			if (dz <= -0.5f){
+				//dz = -0.5f;
 				flag = false;
 			}
 		}
-		else if (dz < 8.0) {
-			//dz += 1 * dt * 0.5f;
+		else if (dz < 4.0) {
+			//dz += 1 * dt;
 			angle += 2.0 * (float)M_PI * dt / 10.0f;
 		}
 		else {
