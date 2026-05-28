@@ -1,229 +1,252 @@
-#include<SDL3/SDL.h>
 #include<stdbool.h>
 #include<stdint.h>
 #include<math.h>
+#include<SDL3/SDL.h>
+#include"model.h"
 
 #define WINDOW_WIDTH 650U
 #define WINDOW_HEIGHT 650U
-#define FPS 120
+#define FPS 120U
+#define NEAR_ZERO 0.001f
 
-typedef struct{
-	SDL_Window *pwindow;
-	SDL_Renderer *prenderer;
+typedef struct {
+	SDL_Window *window;
+	SDL_Renderer *renderer;
+
 	bool is_running;
-} WIN;
+} win_t;
 
-bool CreateWindowRenderer(WIN *restrict target){
-	
-	if (NULL == target){
+static bool init_window_renderer(win_t *restrict target)
+{	
+	if (NULL == target) {
 		return false;
 	}
-	if (!SDL_Init(SDL_INIT_VIDEO)){
+	if (!SDL_Init(SDL_INIT_VIDEO)) {
 		return false;	
 	}
-	target->pwindow = SDL_CreateWindow("Plotter", WINDOW_WIDTH, WINDOW_HEIGHT,0);
-	if (NULL == target->pwindow){
+
+
+	target->window = SDL_CreateWindow("Plotter", WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+	if (NULL == target->window){
 		SDL_Quit();
 		return false;
 	}
-	target->prenderer = SDL_CreateRenderer(target->pwindow, NULL);
-	if (NULL == target->prenderer){
-		SDL_DestroyWindow(target->pwindow);
-		SDL_Quit();
+
+	target->renderer = SDL_CreateRenderer(target->window, NULL);
+	if (NULL == target->renderer) {
+		SDL_DestroyWindow(target->window);
+		SDL_Quit(); 
 		return false;
 	}
+
 	target->is_running = true;
 	return true;
 }
 
-uint32_t TransformXCoordinate(float length){
-	return (length + 1)/2*WINDOW_WIDTH;
+static float transform_x_coordinate(float length)
+{
+	float transformed_x_coordinate = (length + 1.0f) / 2.0f * (float)WINDOW_WIDTH;
+
+	if (transformed_x_coordinate < 0.0f) {
+		transformed_x_coordinate = 0.0f;
+	}
+	if (transformed_x_coordinate > (float)WINDOW_WIDTH) {
+		transformed_x_coordinate = (float)WINDOW_WIDTH;
+	}
+
+	return (float)transformed_x_coordinate;
 }
 
-uint32_t TransformYCoordinate(float length){
-	return (1 - (length + 1)/2)*WINDOW_HEIGHT;
+static float transform_y_coordinate(float length)
+{
+	float transformed_y_coordinate = (1 - (length + 1.0f) / 2.0f) * (float)WINDOW_HEIGHT;
+
+	if (transformed_y_coordinate < 0.0f) {
+		transformed_y_coordinate = 0.0f;
+	}
+	if (transformed_y_coordinate > (float)WINDOW_HEIGHT) {
+		transformed_y_coordinate = (float)WINDOW_HEIGHT;
+	}
+
+	return (float)transformed_y_coordinate;
 }
 
-float ProjectX(float x, float z){
-	return x/z;
+static float project_x(float x, float z)
+{
+	if (z < NEAR_ZERO) {
+		return 0.0f;
+	}
+
+	return x / z;
 }
 
-float ProjectY(float y, float z){
-	return y/z;
+static float project_y(float y, float z)
+{
+	if (z < NEAR_ZERO) {
+		return 0.0f;
+	}
+
+	return y / z;
 }
-void DrawPoint(WIN *target, const float x, const float y, const float z){
-	if (NULL == target){
+
+static void draw_point(win_t *target, const float x, const float y, const float z)
+{
+	if (NULL == target) {
 		return;
 	}
-	const float size = 5;
-	SDL_FRect point = { (TransformXCoordinate(ProjectX(x,z)) - size/2),
-		(TransformYCoordinate(ProjectY(y,z)) - size/2),
-		size, size};
-	SDL_RenderFillRect(target->prenderer, &point);
+
+	const float size = 5.0f;
+	const float offset = size / 2.0f;
+	
+	const float x_projection = project_x(x,z);
+	const float x_coordinate = transform_x_coordinate(x_projection) - offset;
+
+	const float y_projection = project_y(y,z);
+	const float y_coordinate = transform_y_coordinate(y_projection) - offset;
+
+
+	SDL_FRect point = { x_coordinate, y_coordinate, size, size};
+	(void)SDL_RenderFillRect(target->renderer, &point);
 }
 
-float Translate(const float z, const float dz){
+static inline float translate(const float z, const float dz)
+{
 	return z + dz;
 }
 
-float RotateX_xz(const float x, const float z, const float angle){
-	return x * cos(angle) - z * sin(angle);
+static inline float rotate_x_xz(const float x, const float z, const float angle)
+{
+	return x * cosf(angle) - z * sinf(angle);
 }
 
-float RotateZ_xz(const float x, const float z, const float angle){
-	return x * sin(angle) + z * cos(angle);
+static inline float rotate_z_xz(const float x, const float z, const float angle)
+{
+	return x * sinf(angle) + z * cosf(angle);
 }
 
-void DrawLine(WIN *target, const float x1, const float y1, const float z1, const float x2, const float y2, const float z2){
-	SDL_RenderLine(target->prenderer,
-			TransformXCoordinate(ProjectX(x1, z1)),
-			TransformYCoordinate(ProjectY(y1, z1)),
-			TransformXCoordinate(ProjectX(x2, z2)),
-			TransformYCoordinate(ProjectY(y2, z2)));
+static void draw_line(win_t *target,
+		const float x1, const float y1, const float z1, 
+		const float x2, const float y2, const float z2)
+{
+	(void)SDL_RenderLine(target->renderer,
+			transform_x_coordinate(project_x(x1, z1)),
+			transform_y_coordinate(project_y(y1, z1)),
+			transform_x_coordinate(project_x(x2, z2)),
+			transform_y_coordinate(project_y(y2, z2)));
 }
 
-void frame(WIN *target, uint32_t rows, uint32_t cols, const float points[rows][cols], uint32_t rows_phase, uint32_t cols_phase, const uint32_t phases[rows_phase][cols_phase], const float dz, const float angle){
-	SDL_SetRenderDrawColor(target->prenderer, 255U, 100U, 255U, 150U);
-	SDL_RenderClear(target->prenderer);
-	SDL_SetRenderDrawColor(target->prenderer, 99U, 35U, 188U, 255U);
-	for (uint8_t r=0; r<rows; r++){
-		float x = points[r][0];
-		//float y = points[r][1];
-		float z = points[r][2];
-		DrawPoint(target, RotateX_xz(x,z,angle), points[r][1], Translate(RotateZ_xz(x,z,angle), dz));
+static void frame(win_t *target, const float dz, const float angle)
+{
+	(void)SDL_SetRenderDrawColor(target->renderer, 255U, 100U, 255U, 150U);
+	(void)SDL_RenderClear(target->renderer);
+	(void)SDL_SetRenderDrawColor(target->renderer, 99U, 35U, 188U, 255U);
+
+
+	for (uint32_t r = 0; r < POINT_COUNT; r++) {
+		const float x = points[r][0];
+		const float y = points[r][1];
+		const float z = points[r][2];
+		
+		float x_rotated = rotate_x_xz(x, z, angle);
+		float z_rotated = rotate_z_xz(x, z, angle);
+
+		float z_translated_rotated = translate(z_rotated, dz);
+
+		(void)draw_point(target, x_rotated, y, z_translated_rotated);
 	}
-	for (uint32_t r = 0; r < rows_phase; r++) {
-    		uint32_t a = phases[r][0];
-    		uint32_t b = phases[r][1];
-    		float ax = RotateX_xz(points[a][0], points[a][2], angle);
-    		float az = Translate(RotateZ_xz(points[a][0], points[a][2], angle), dz);
-    		float bx = RotateX_xz(points[b][0], points[b][2], angle);
-    		float bz = Translate(RotateZ_xz(points[b][0], points[b][2], angle), dz);
-    		DrawLine(target, ax, points[a][1], az, bx, points[b][1], bz);
+
+	for (uint32_t r = 0; r < PHASE_COUNT; r++) {
+    		const uint32_t current_index = phases[r][0];
+    		const uint32_t next_index = phases[r][1];
+
+		const float x_point_one = points[current_index][0];
+		const float y_point_one = points[current_index][1];
+		const float z_point_one = points[current_index][2];
+
+		const float x_point_two = points[next_index][0];
+		const float y_point_two = points[next_index][1];
+		const float z_point_two = points[next_index][2];
+
+		const float x_point_one_rotated = rotate_x_xz(x_point_one, z_point_one, angle);
+		const float z_point_one_rotated = rotate_z_xz(x_point_one, z_point_one, angle);
+		const float z_point_one_rotated_translated = translate(z_point_one_rotated, dz);
+
+		const float x_point_two_rotated = rotate_x_xz(x_point_two, z_point_two, angle);
+		const float z_point_two_rotated = rotate_z_xz(x_point_two, z_point_two, angle);
+		const float z_point_two_rotated_translated = translate(z_point_two_rotated, dz);
+    		
+
+		(void)draw_line(target, 
+			 x_point_one_rotated, 
+			 y_point_one, 
+			 z_point_one_rotated_translated, 
+			 x_point_two_rotated, 
+			 y_point_two,
+			 z_point_two_rotated_translated);
 	}
 }
 
-void mainloop(WIN *root){
-	if (NULL == root){
+static void mainloop(win_t *root)
+{
+	if (NULL == root) {
 		return;
 	}
+
 	SDL_Event event;
 
-	float dz = 1;
-	const float dt = 1.0f/FPS;
-	float angle = 0;
-	const int8_t delay = 1000/FPS;
-	SDL_SetRenderDrawColor(root->prenderer, 255U, 100U, 255U, 150U);
-	//float points[8][3] = {
-	//	{0.25,0.25,0.25},
-	//	{-0.25,0.25,0.25},
-	//	{0.25,-0.25,0.25},
-	//	{-0.25,-0.25,0.25},
-	//	
-	//	{0.25,0.25,-0.25},
-	//	{-0.25,0.25,-0.25},
-	//	{0.25,-0.25,-0.25},
-	//	{-0.25,-0.25,-0.25}
-	//};
-	const float points[20][3] = {
-	{0.202073f, 0.202073f, 0.202073f},
-	{0.202073f, 0.202073f, -0.202073f},
-	{0.202073f, -0.202073f, 0.202073f},
-	{0.202073f, -0.202073f, -0.202073f},
-	{-0.202073f, 0.202073f, 0.202073f},
-	{-0.202073f, 0.202073f, -0.202073f},
-	{-0.202073f, -0.202073f, 0.202073f},
-	{-0.202073f, -0.202073f, -0.202073f},
-	{0.000000f, 0.326960f, 0.124888f},
-	{0.000000f, 0.326960f, -0.124888f},
-	{0.000000f, -0.326960f, 0.124888f},
-	{0.000000f, -0.326960f, -0.124888f},
-	{0.124888f, 0.000000f, 0.326960f},
-	{0.124888f, 0.000000f, -0.326960f},
-	{-0.124888f, 0.000000f, 0.326960f},
-	{-0.124888f, 0.000000f, -0.326960f},
-	{0.326960f, 0.124888f, 0.000000f},
-	{0.326960f, -0.124888f, 0.000000f},
-	{-0.326960f, 0.124888f, 0.000000f},
-	{-0.326960f, -0.124888f, 0.000000f},
-};
-	//uint32_t vertexes[12][2] = {
-	//	{0,1},{2,3},{0,2},
-	//	{1,3},{4,5},{6,7},
-	//	{4,6},{5,7},{0,4},
-	//	{1,5},{2,6},{3,7}
-	//};
-const uint32_t vertexes[30][2] = {
-	{0U, 16U},
-	{1U, 16U},
-	{2U, 17U},
-	{3U, 17U},
-	{4U, 18U},
-	{5U, 18U},
-	{6U, 19U},
-	{7U, 19U},
-	{8U, 9U},
-	{10U, 11U},
-	{12U, 14U},
-	{13U, 15U},
-	{16U, 17U},
-	{18U, 19U},
-	{0U, 8U},
-	{0U, 12U},
-	{1U, 9U},
-	{1U, 13U},
-	{2U, 10U},
-	{2U, 12U},
-	{3U, 11U},
-	{3U, 13U},
-	{4U, 8U},
-	{4U, 14U},
-	{5U, 9U},
-	{5U, 15U},
-	{6U, 10U},
-	{6U, 14U},
-	{7U, 11U},
-	{7U, 15U},
-};
+	float dz = 1.0f;
+	const float dt = 1.0f / FPS;
+	float angle = 0.0f;
+	const int32_t delay = 1000U / FPS;
+
+	(void)SDL_SetRenderDrawColor(root->renderer, 255U, 100U, 255U, 150U);
+
 	bool flag = false;
-	while (root->is_running){
-		while (SDL_PollEvent(&event)){
-				if (event.type == SDL_EVENT_QUIT) { root->is_running = false; }
+	while (root->is_running) {
+		while (SDL_PollEvent(&event)) {
+				if (event.type == SDL_EVENT_QUIT) { 
+					root->is_running = false; 
 				}
-		if (flag){
-			dz -= 1 * dt;
-			angle += 2 * 3.1415 * dt * 2;
-			if (dz <= 0.65f){
-				dz = 0.65f;
+		}
+
+		if (flag) {
+			//dz -= 1 * dt * 0.5f;
+			angle += 2.0 * (float)M_PI * dt / 10.0f;
+			if (dz <= 0.01f){
+				dz = 0.01f;
 				flag = false;
 			}
 		}
-		else if (dz < 5.0){
-			dz += 1 * dt;
-			angle += 2 * 3.1415 * dt/2;
+		else if (dz < 8.0) {
+			//dz += 1 * dt * 0.5f;
+			angle += 2.0 * (float)M_PI * dt / 10.0f;
 		}
 		else {
 			flag = true;
 		}
-		frame(root, 20, 3, points, 30, 2, vertexes, dz, angle);
-		SDL_RenderPresent(root->prenderer);
-		SDL_Delay(delay);
+
+		(void)frame(root, dz, angle);
+		(void)SDL_RenderPresent(root->renderer);
+		(void)SDL_Delay(delay);
 		}
 }
 
-int main(void){
-	
-	WIN root = {
-		.pwindow = NULL,
-		.prenderer = NULL,
+int main(void)
+{	
+	win_t root = {
+		.window = NULL,
+		.renderer = NULL,
 		.is_running = false
 	};
-	if (!CreateWindowRenderer(&root)){
+
+	if (!init_window_renderer(&root)){
 		return 1;
 	}
-	mainloop(&root);
-	SDL_DestroyRenderer(root.prenderer);
-	SDL_DestroyWindow(root.pwindow);
-	SDL_Quit();
+
+	(void)mainloop(&root);
+	(void)SDL_DestroyRenderer(root.renderer);
+	(void)SDL_DestroyWindow(root.window);
+	(void)SDL_Quit();
+
 	return 0;
 }
