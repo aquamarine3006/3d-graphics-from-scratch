@@ -1,23 +1,33 @@
-#include<stdbool.h>
-#include<stdint.h>
-#include<math.h>
-#include<SDL3/SDL.h>
-#include"model-crane-cow.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <math.h>
+
+#include <SDL3/SDL.h>
+
+#include "vector_t.h"
+#include "phase_t.h"
+#include "model-nefertiti.h"
 
 #define WINDOW_WIDTH 650U
 #define WINDOW_HEIGHT 650U
 #define FPS 120U
 #define NEAR_ZERO 0.001f
-#define POINT_SIZE 3.0f
+#define POINT_SIZE 0.1f
+#define POINT_OFFSET (POINT_SIZE / 2.0f)
+#define STARTING_Z_POS 1.33f
+#define ROTATIONAL_SPEED_PERCENTAGE 0.025f
 
-#define BG_RED 255U
+#define USE_TRANSLATION_ANIMATION 0U //true
+#define TRANSLATION_SPEED_PERCENTAGE 5.0f
+
+#define BG_RED 100U
 #define BG_GREEN 100U
-#define BG_BLUE 100U
+#define BG_BLUE 180U
 #define BG_A 255U
 
-#define FG_RED 0U
+#define FG_RED 100U
 #define FG_GREEN 0U
-#define FG_BLUE 0U
+#define FG_BLUE 10U
 #define FG_A 255U
 
 typedef struct {
@@ -27,35 +37,46 @@ typedef struct {
 	bool is_running;
 } win_t;
 
-static bool init_window_renderer(win_t *restrict target)
+typedef enum {
+	STATUS_OK = 0U,
+	STATUS_ERR_ARG = 1U,
+	STATUS_ERR_OP = 2U
+} status_t;
+
+static status_t init_window_renderer(win_t *restrict target)
 {	
 	if (NULL == target) {
-		return false;
+		return STATUS_ERR_ARG;
 	}
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
-		return false;	
+		SDL_Quit();
+		return STATUS_ERR_ARG;	
 	}
 
 
 	target->window = SDL_CreateWindow("Plotter", WINDOW_WIDTH, WINDOW_HEIGHT, 0);
 	if (NULL == target->window){
 		SDL_Quit();
-		return false;
+		return STATUS_ERR_ARG;
 	}
 
 	target->renderer = SDL_CreateRenderer(target->window, NULL);
 	if (NULL == target->renderer) {
 		SDL_DestroyWindow(target->window);
 		SDL_Quit(); 
-		return false;
+		return STATUS_ERR_ARG;
 	}
 
 	target->is_running = true;
-	return true;
+	return STATUS_OK;
 }
 
 static float transform_x_coordinate(float length)
 {
+	if (!isfinite(length)) {
+		return 0.0f;
+	}
+
 	float transformed_x_coordinate = (length + 1.0f) / 2.0f * (float)WINDOW_WIDTH;
 
 	if (transformed_x_coordinate < 0.0f) {
@@ -65,12 +86,17 @@ static float transform_x_coordinate(float length)
 		transformed_x_coordinate = (float)WINDOW_WIDTH;
 	}
 
-	return (float)transformed_x_coordinate;
+	return transformed_x_coordinate;
 }
 
 static float transform_y_coordinate(float length)
 {
-	float transformed_y_coordinate = (1 - (length + 1.0f) / 2.0f) * (float)WINDOW_HEIGHT;
+
+	if (!isfinite(length)) {
+		return 0.0f;
+	}
+
+	float transformed_y_coordinate = (1.0f - (length + 1.0f) / 2.0f) * (float)WINDOW_HEIGHT;
 
 	if (transformed_y_coordinate < 0.0f) {
 		transformed_y_coordinate = 0.0f;
@@ -79,40 +105,29 @@ static float transform_y_coordinate(float length)
 		transformed_y_coordinate = (float)WINDOW_HEIGHT;
 	}
 
-	return (float)transformed_y_coordinate;
+	return transformed_y_coordinate;
 }
 
-static float project_x(float x, float z)
+static float project_coordinate(float coordinate, float z)
 {
 	if (z < NEAR_ZERO) {
 		return 0.0f;
 	}
 
-	return x / z;
+	return coordinate / z;
 }
 
-static float project_y(float y, float z)
-{
-	if (z < NEAR_ZERO) {
-		return 0.0f;
-	}
-
-	return y / z;
-}
-
-static void draw_point(win_t *target, const float x, const float y, const float z)
+static void draw_point(win_t *restrict target, const float x, const float y, const float z)
 {
 	if (NULL == target) {
 		return;
 	}
 
-	const float offset = POINT_SIZE / 2.0f;
-	
-	const float x_projection = project_x(x,z);
-	const float x_coordinate = transform_x_coordinate(x_projection) - offset;
+	const float x_projection = project_coordinate(x,z);
+	const float x_coordinate = transform_x_coordinate(x_projection) - POINT_OFFSET;
 
-	const float y_projection = project_y(y,z);
-	const float y_coordinate = transform_y_coordinate(y_projection) - offset;
+	const float y_projection = project_coordinate(y,z);
+	const float y_coordinate = transform_y_coordinate(y_projection) - POINT_OFFSET;
 
 
 	SDL_FRect point = { x_coordinate, y_coordinate, POINT_SIZE, POINT_SIZE};
@@ -124,119 +139,149 @@ static inline float translate(const float z, const float dz)
 	return z + dz;
 }
 
-static inline float rotate_x_xz(const float x, const float z, const float angle)
+static inline float rotate_x_around_yaxis(const float x, const float z, const float angle)
 {
 	return x * cosf(angle) - z * sinf(angle);
 }
 
-static inline float rotate_z_xz(const float x, const float z, const float angle)
+static inline float rotate_z_around_yaxis(const float x, const float z, const float angle)
 {
 	return x * sinf(angle) + z * cosf(angle);
 }
 
-static void draw_line(win_t *target,
+static void draw_line(win_t *restrict target,
 		const float x1, const float y1, const float z1, 
 		const float x2, const float y2, const float z2)
 {
+	if (NULL == target || NULL == target->renderer) {
+		return;
+	} 
+
+	const float x1_projected = project_coordinate(x1, z1);
+	const float y1_projected = project_coordinate(y1, z1);
+	const float x2_projected = project_coordinate(x2, z2);
+	const float y2_projected = project_coordinate(y2, z2);
+
+	const float x1_transformed_corrected = transform_x_coordinate(x1_projected) - POINT_OFFSET;
+	const float y1_transformed_corrected = transform_y_coordinate(y1_projected) - POINT_OFFSET;
+	const float x2_transformed_corrected = transform_x_coordinate(x2_projected) - POINT_OFFSET;
+	const float y2_transformed_corrected = transform_y_coordinate(y2_projected) - POINT_OFFSET;
 	(void)SDL_RenderLine(target->renderer,
-			transform_x_coordinate(project_x(x1, z1)),
-			transform_y_coordinate(project_y(y1, z1)),
-			transform_x_coordinate(project_x(x2, z2)),
-			transform_y_coordinate(project_y(y2, z2)));
+			     x1_transformed_corrected,
+			     y1_transformed_corrected,
+			     x2_transformed_corrected,
+			     y2_transformed_corrected);
 }
 
-static void frame(win_t *target, const float dz, const float angle)
+static void draw_points(win_t *restrict target, const float dz, const float angle) 
 {
+	if (NULL == target || NULL == target->renderer) {
+		return;
+	}
+
+	for (uint32_t r = 0; r < POINT_COUNT; r++) {
+		const float x = points[r].x;
+		const float y = points[r].y;
+		const float z = points[r].z;
+		
+		const float x_rotated = rotate_x_around_yaxis(x, z, angle);
+		const float z_rotated = rotate_z_around_yaxis(x, z, angle);
+
+		const float z_translated_rotated = translate(z_rotated, dz);
+
+		(void)draw_point(target, x_rotated, y, z_translated_rotated);
+	}
+}
+
+static void draw_lines(win_t *restrict target, const float dz, const float angle)
+{
+	if (NULL == target || NULL == target->renderer) {
+		return;
+	}
+
+	for (uint32_t r = 0; r < PHASE_COUNT; r++) {
+    		const uint32_t current_index = phases[r].index_from;
+    		const uint32_t next_index = phases[r].index_to;
+		
+		if (current_index >= POINT_COUNT || next_index >= POINT_COUNT) {
+			continue;
+		}
+
+		const float x_point1 = points[current_index].x;
+		const float y_point1 = points[current_index].y;
+		const float z_point1 = points[current_index].z;
+
+		const float x_point2 = points[next_index].x;
+		const float y_point2 = points[next_index].y;
+		const float z_point2 = points[next_index].z;
+
+		const float x_point1_rotated = rotate_x_around_yaxis(x_point1, z_point1, angle);
+		const float z_point1_rotated = rotate_z_around_yaxis(x_point1, z_point1, angle);
+		const float z_point1_rotated_translated = translate(z_point1_rotated, dz);
+
+		const float x_point2_rotated = rotate_x_around_yaxis(x_point2, z_point2, angle);
+		const float z_point2_rotated = rotate_z_around_yaxis(x_point2, z_point2, angle);
+		const float z_point2_rotated_translated = translate(z_point2_rotated, dz);
+    		
+
+		(void)draw_line(target, 
+			 x_point1_rotated, 
+			 y_point1, 
+			 z_point1_rotated_translated, 
+			 x_point2_rotated, 
+			 y_point2,
+			 z_point2_rotated_translated);
+	}
+}
+
+static void frame(win_t *restrict target, const float dz, const float angle)
+{
+	if (NULL == target || NULL == target->renderer) {
+		return;
+	}
+
 	(void)SDL_SetRenderDrawColor(target->renderer, BG_RED, BG_GREEN, BG_BLUE, BG_A);
 	(void)SDL_RenderClear(target->renderer);
 	(void)SDL_SetRenderDrawColor(target->renderer, FG_RED, FG_GREEN, FG_BLUE, FG_A);
 
 
-	for (uint32_t r = 0; r < POINT_COUNT; r++) {
-		const float x = points[r][0];
-		const float y = points[r][1];
-		const float z = points[r][2];
-		
-		float x_rotated = rotate_x_xz(x, z, angle);
-		float z_rotated = rotate_z_xz(x, z, angle);
-
-		float z_translated_rotated = translate(z_rotated, dz);
-
-		(void)draw_point(target, x_rotated, y, z_translated_rotated);
-	}
-
-	for (uint32_t r = 0; r < PHASE_COUNT; r++) {
-    		const uint32_t current_index = phases[r][0];
-    		const uint32_t next_index = phases[r][1];
-
-		const float x_point_one = points[current_index][0];
-		const float y_point_one = points[current_index][1];
-		const float z_point_one = points[current_index][2];
-
-		const float x_point_two = points[next_index][0];
-		const float y_point_two = points[next_index][1];
-		const float z_point_two = points[next_index][2];
-
-		const float x_point_one_rotated = rotate_x_xz(x_point_one, z_point_one, angle);
-		const float z_point_one_rotated = rotate_z_xz(x_point_one, z_point_one, angle);
-		const float z_point_one_rotated_translated = translate(z_point_one_rotated, dz);
-
-		const float x_point_two_rotated = rotate_x_xz(x_point_two, z_point_two, angle);
-		const float z_point_two_rotated = rotate_z_xz(x_point_two, z_point_two, angle);
-		const float z_point_two_rotated_translated = translate(z_point_two_rotated, dz);
-    		
-
-		(void)draw_line(target, 
-			 x_point_one_rotated, 
-			 y_point_one, 
-			 z_point_one_rotated_translated, 
-			 x_point_two_rotated, 
-			 y_point_two,
-			 z_point_two_rotated_translated);
-	}
+	(void)draw_points(target, dz, angle);
+	(void)draw_lines(target, dz, angle);
 }
 
-static void mainloop(win_t *root)
+static void mainloop(win_t *restrict target)
 {
-	if (NULL == root) {
+	if (NULL == target) {
 		return;
 	}
 
 	SDL_Event event;
 
-	float dz = 0.65f;
+	float dz = STARTING_Z_POS;
 	const float dt = 1.0f / FPS;
 	float angle = 0.0f;
-	const int32_t delay = 1000U / FPS;
+	const uint32_t delay = 1000U / FPS;
 
-	bool flag = false;
-	while (root->is_running) {
+	while (target->is_running) {
 		while (SDL_PollEvent(&event)) {
 				if (event.type == SDL_EVENT_QUIT) { 
-					root->is_running = false; 
+					target->is_running = false; 
 				}
 		}
 
-		if (flag) {
-			dz -= 1 * dt;
-			angle += 2.0 * (float)M_PI * dt / 10.0f;
-			if (dz <= -0.5f){
-				//dz = -0.5f;
-				flag = false;
-			}
-		}
-		else if (dz < 4.0) {
-			//dz += 1 * dt;
-			angle += 2.0 * (float)M_PI * dt / 10.0f;
-		}
-		else {
-			flag = true;
+		#if USE_TRANSLATION_ANIMATION
+			dz += 1.0f * dt * TRANSLATION_SPEED_PERCENTAGE;
+		#endif
+		angle += 2.0f * (float)M_PI * dt * ROTATIONAL_SPEED_PERCENTAGE;
+		if (angle >= 2.0f * (float)M_PI) {
+			angle -= 2.0f * (float)M_PI;
 		}
 
-		(void)frame(root, dz, angle);
-		(void)SDL_RenderPresent(root->renderer);
-		(void)SDL_Delay(delay);
-		}
+		(void)frame(target, dz, angle);
+		(void)SDL_RenderPresent(target->renderer);
+		(void)SDL_DelayPrecise((uint64_t)delay);
+		
+	}
 }
 
 int main(void)
@@ -246,15 +291,19 @@ int main(void)
 		.renderer = NULL,
 		.is_running = false
 	};
+	
+	status_t win_status = init_window_renderer(&root);
 
-	if (!init_window_renderer(&root)){
+	if (STATUS_ERR_ARG == win_status || 
+	    STATUS_ERR_OP == win_status){
 		return 1;
 	}
-
-	(void)mainloop(&root);
-	(void)SDL_DestroyRenderer(root.renderer);
-	(void)SDL_DestroyWindow(root.window);
-	(void)SDL_Quit();
+	else if (STATUS_OK == win_status) {
+		(void)mainloop(&root);
+		(void)SDL_DestroyRenderer(root.renderer);
+		(void)SDL_DestroyWindow(root.window);
+		(void)SDL_Quit();
+	}
 
 	return 0;
 }
