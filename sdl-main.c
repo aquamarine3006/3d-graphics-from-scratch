@@ -15,7 +15,7 @@
 #define POINT_SIZE 0.1f
 #define POINT_OFFSET (POINT_SIZE / 2.0f)
 #define STARTING_Z_POS 1.33f
-#define ROTATIONAL_SPEED_PERCENTAGE 0.025f
+#define ROTATIONAL_SPEED_PERCENTAGE 0.1f
 
 #define USE_TRANSLATION_ANIMATION 0U //true
 #define TRANSLATION_SPEED_PERCENTAGE 5.0f
@@ -30,7 +30,8 @@
 #define FG_BLUE 10U
 #define FG_A 255U
 
-typedef struct {
+
+typedef struct win_s {
 	SDL_Window *window;
 	SDL_Renderer *renderer;
 
@@ -42,6 +43,7 @@ typedef enum {
 	STATUS_ERR_ARG = 1U,
 	STATUS_ERR_OP = 2U
 } status_t;
+
 
 static status_t init_window_renderer(win_t *restrict target)
 {	
@@ -71,13 +73,14 @@ static status_t init_window_renderer(win_t *restrict target)
 	return STATUS_OK;
 }
 
-static float transform_x_coordinate(float length)
+static float transform_x_coordinate(const float length)
 {
 	if (!isfinite(length)) {
 		return 0.0f;
 	}
-
-	float transformed_x_coordinate = (length + 1.0f) / 2.0f * (float)WINDOW_WIDTH;
+	
+	const float transformed_len = (length + 1.0f) / 2.0f;
+	float transformed_x_coordinate = transformed_len * (float)WINDOW_WIDTH;
 
 	if (transformed_x_coordinate < 0.0f) {
 		transformed_x_coordinate = 0.0f;
@@ -89,14 +92,16 @@ static float transform_x_coordinate(float length)
 	return transformed_x_coordinate;
 }
 
-static float transform_y_coordinate(float length)
+static float transform_y_coordinate(const float length)
 {
 
 	if (!isfinite(length)) {
 		return 0.0f;
 	}
 
-	float transformed_y_coordinate = (1.0f - (length + 1.0f) / 2.0f) * (float)WINDOW_HEIGHT;
+	const float transformed_len = (length + 1.0f) / 2.0f;
+	const float inverted_len = 1.0f - transformed_len;
+	float transformed_y_coordinate = inverted_len * (float)WINDOW_HEIGHT;
 
 	if (transformed_y_coordinate < 0.0f) {
 		transformed_y_coordinate = 0.0f;
@@ -108,7 +113,7 @@ static float transform_y_coordinate(float length)
 	return transformed_y_coordinate;
 }
 
-static float project_coordinate(float coordinate, float z)
+static float project_coordinate(const float coordinate, const float z)
 {
 	if (z < NEAR_ZERO) {
 		return 0.0f;
@@ -258,9 +263,10 @@ static void mainloop(win_t *restrict target)
 	SDL_Event event;
 
 	float dz = STARTING_Z_POS;
-	const float dt = 1.0f / FPS;
+	const float dt = 1.0f / (float)FPS;
 	float angle = 0.0f;
-	const uint32_t delay = 1000U / FPS;
+	const float delay = 1000U / (float)FPS;
+	const uint64_t delay_ns = (uint64_t)(delay * 1000000ULL);
 
 	while (target->is_running) {
 		while (SDL_PollEvent(&event)) {
@@ -279,7 +285,7 @@ static void mainloop(win_t *restrict target)
 
 		(void)frame(target, dz, angle);
 		(void)SDL_RenderPresent(target->renderer);
-		(void)SDL_DelayPrecise((uint64_t)delay);
+		(void)SDL_DelayPrecise(delay_ns);
 		
 	}
 }
