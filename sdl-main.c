@@ -8,26 +8,26 @@
 #include "phase_t.h"
 #include "model-nefertiti.h"
 
-#define WINDOW_WIDTH 650U
-#define WINDOW_HEIGHT 650U
+#define WINDOW_WIDTH 900U
+#define WINDOW_HEIGHT 900U
 #define FPS 120U
 #define NEAR_ZERO 0.001f
-#define POINT_SIZE 0.1f
+#define POINT_SIZE 0.5f
 #define POINT_OFFSET (POINT_SIZE / 2.0f)
-#define STARTING_Z_POS 1.33f
+#define STARTING_Z_POS 1.5f
 #define ROTATIONAL_SPEED_PERCENTAGE 0.1f
 
 #define USE_TRANSLATION_ANIMATION 0U //true
 #define TRANSLATION_SPEED_PERCENTAGE 5.0f
 
-#define BG_RED 100U
-#define BG_GREEN 100U
-#define BG_BLUE 180U
+#define BG_RED 24U
+#define BG_GREEN 28U
+#define BG_BLUE 34U
 #define BG_A 255U
 
-#define FG_RED 100U
-#define FG_GREEN 0U
-#define FG_BLUE 10U
+#define FG_RED 130U
+#define FG_GREEN 238U
+#define FG_BLUE 255U
 #define FG_A 255U
 
 
