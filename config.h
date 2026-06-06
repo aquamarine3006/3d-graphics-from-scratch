@@ -1,13 +1,15 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#define MODEL_PATH "models/model_horse.h"
+
 #define WINDOW_WIDTH 1025U
 #define WINDOW_HEIGHT 1025U
 #define FPS 120U
 #define NEAR_ZERO 0.001f
 #define POINT_SIZE 0.5f
 #define POINT_OFFSET (POINT_SIZE / 2.0f)
-#define STARTING_Z_POS 1.40f
+#define STARTING_Z_POS 1.00f
 #define ROTATIONAL_SPEED_PERCENTAGE 0.1f
 
 #define USE_TRANSLATION_ANIMATION 0U //true

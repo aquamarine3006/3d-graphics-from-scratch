@@ -1,8 +1,8 @@
 #ifndef MODEL_NEFERTITI_H
 #define MODEL_NEFERTITI_H
 #include <stdint.h>
-#include "vector_t.h"
-#include "phase_t.h"
+#include "../vector_t.h"
+#include "../phase_t.h"
 
 #define POINT_COUNT 10115U
 #define PHASE_COUNT 30000U

@@ -8,7 +8,7 @@
 #include "project.h"
 #include "vector_t.h"
 #include "phase_t.h"
-#include "models/model_nefertiti.h"
+#include MODEL_PATH
 
 void draw_point(win_t *restrict target, const float x, const float y, const float z)
 {
