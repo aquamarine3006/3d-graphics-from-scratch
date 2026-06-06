@@ -1,4 +1,4 @@
-#ifndef MODEL_H
+#ifndef MODEL_BAT_LOGO_H
 #define POINT_COUNT 66U
 #define PHASE_COUNT 109U
 

@@ -3,7 +3,7 @@
 #define POINT_COUNT 100000U
 #define PHASE_COUNT 150000U
 
-const float points[100000][3] = {
+static const float points[100000][3] = {
 	{0.085097f, -0.619853f, 0.155982f},
 	{0.085936f, -0.620945f, 0.155814f},
 	{0.087112f, -0.620021f, 0.158165f},
@@ -100006,7 +100006,7 @@ const float points[100000][3] = {
 	{0.176238f, -0.668229f, 0.099923f}
 };
 
-const uint32_t phases[150000][2] = {
+static const uint32_t phases[150000][2] = {
 	{0U, 1U}, {0U, 2U}, {0U, 94U}, {0U, 95U}, {0U, 175U},
 	{0U, 176U}, {0U, 48508U}, {0U, 48584U}, {1U, 2U}, {1U, 3U},
 	{1U, 4U}, {1U, 159U}, {1U, 175U}, {2U, 4U}, {2U, 5U},

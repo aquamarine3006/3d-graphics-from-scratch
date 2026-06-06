@@ -1,8 +1,8 @@
-#ifndef MODEL_H
+#ifndef MODEL_CRANE_COW_H
 #define POINT_COUNT 2930U
 #define PHASE_COUNT 8784U
 
-const float points[2930][3] = {
+static const float points[2930][3] = {
 	{0.142126f, -0.180681f, -0.111353f},
 	{0.127593f, -0.206785f, 0.281623f},
 	{0.108696f, 0.029826f, -0.027431f},
@@ -2935,7 +2935,7 @@ const float points[2930][3] = {
 	{-0.005594f, -0.076604f, 0.349152f},
 };
 
-const uint32_t phases[8784][2] = {
+static const uint32_t phases[8784][2] = {
 	{0U, 764U}, {0U, 767U}, {0U, 812U}, {0U, 813U}, {0U, 1158U},
 	{0U, 1165U}, {1U, 794U}, {1U, 797U}, {1U, 860U}, {1U, 863U},
 	{1U, 1110U}, {2U, 908U}, {2U, 911U}, {2U, 997U}, {2U, 999U},

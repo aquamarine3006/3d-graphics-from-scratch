@@ -1,8 +1,9 @@
-#ifndef MODEL_H 
+#ifndef MODEL_H
+#define MODEL_H
 #define POINT_COUNT 60U
 #define PHASE_COUNT 90U
 
-const float points[60][3] = {
+static const float points[60][3] = {
 	{-0.342801f, 0.000000f, -0.070621f},
 	{-0.342801f, 0.000000f, 0.070621f},
 	{-0.299155f, -0.114267f, -0.141242f},
@@ -65,7 +66,7 @@ const float points[60][3] = {
 	{0.342801f, 0.000000f, 0.070621f},
 };
 
-const uint32_t phases[90][2] = {
+static const uint32_t phases[90][2] = {
 	{0U, 1U}, {0U, 2U}, {0U, 4U}, {1U, 3U}, {1U, 5U},
 	{2U, 6U}, {2U, 10U}, {3U, 7U}, {3U, 11U}, {4U, 8U},
 	{4U, 12U}, {5U, 9U}, {5U, 13U}, {6U, 7U}, {6U, 14U},

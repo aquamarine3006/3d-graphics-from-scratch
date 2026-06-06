@@ -2,7 +2,7 @@
 #define POINT_COUNT 20480U
 #define PHASE_COUNT  61440U
 
-const float points[20480][3] = {
+static const float points[20480][3] = {
 	{0.384615f, 0.000000f, 0.000000f},
 	{0.384086f, 0.000000f, 0.010771f},
 	{0.382504f, 0.000000f, 0.021438f},
@@ -20485,7 +20485,7 @@ const float points[20480][3] = {
 	{0.381407f, -0.017694f, 0.008306f},
 };
 
-const uint32_t phases[61440][2] = {
+static const uint32_t phases[61440][2] = {
 	{0U, 64U},
 	{0U, 1U},
 	{0U, 65U},

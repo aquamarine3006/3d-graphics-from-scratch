@@ -1,0 +1,26 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define WINDOW_WIDTH 1025U
+#define WINDOW_HEIGHT 1025U
+#define FPS 120U
+#define NEAR_ZERO 0.001f
+#define POINT_SIZE 0.5f
+#define POINT_OFFSET (POINT_SIZE / 2.0f)
+#define STARTING_Z_POS 1.40f
+#define ROTATIONAL_SPEED_PERCENTAGE 0.1f
+
+#define USE_TRANSLATION_ANIMATION 0U //true
+#define TRANSLATION_SPEED_PERCENTAGE 5.0f
+
+#define BG_RED 24U
+#define BG_GREEN 28U
+#define BG_BLUE 34U
+#define BG_A 255U
+
+#define FG_RED 130U
+#define FG_GREEN 238U
+#define FG_BLUE 255U
+#define FG_A 255U
+
+#endif
